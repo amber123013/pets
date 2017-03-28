@@ -4,7 +4,7 @@ package com.example.android.pets;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
@@ -14,14 +14,12 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.example.android.pets.data.PetContract.PetEntry;
-import com.example.android.pets.data.PetDBHelper;
 
 /**
  * 显示 宠物列表
  */
 public class CatalogActivity extends AppCompatActivity {
-    //PetDBHelper 实例
-    private PetDBHelper mDBHelper;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -36,7 +34,7 @@ public class CatalogActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-        mDBHelper = new PetDBHelper(this);
+
     }
 
     @Override
@@ -53,22 +51,10 @@ public class CatalogActivity extends AppCompatActivity {
         displayDatabaseInfo();
     }
 
-    private void insertPet() {
-
-        // 创建或者打开数据库 读取
-        SQLiteDatabase db = mDBHelper.getReadableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(PetEntry.COLUMN_PET_NAME, "Garfield");
-        values.put(PetEntry.COLUMN_PET_BREED, "Tabby");
-        values.put(PetEntry.COLUMN_PET_GENDER, PetEntry.GENDER_MALE);
-        values.put(PetEntry.COLUMN_PET_WEIGHT, 7);
-        db.insert(PetEntry.TABLE_NAME, null, values);
-        displayDatabaseInfo();
-    }
     private void displayDatabaseInfo() {
 
         // 创建或者打开数据库 读取
-        SQLiteDatabase db = mDBHelper.getReadableDatabase();
+//        SQLiteDatabase db = mDBHelper.getReadableDatabase();
 
         // 执行查询语句
         // 获取 所要数据 （以Cursor返回
@@ -79,7 +65,7 @@ public class CatalogActivity extends AppCompatActivity {
                 PetEntry.COLUMN_PET_BREED,
                 PetEntry.COLUMN_PET_GENDER,
                 PetEntry.COLUMN_PET_WEIGHT };
-
+    /**
         Cursor cursor = db.query(
                 PetEntry.TABLE_NAME,   // 查询的表名
                 projection,            // 返回的列
@@ -88,6 +74,8 @@ public class CatalogActivity extends AppCompatActivity {
                 null,                  // Don't group the rows
                 null,                  // 不按行分组
                 null);                   // 排序
+     */
+        Cursor cursor = getContentResolver().query(PetEntry.CONTENT_URI,projection,null,null,null);
         TextView displayView = (TextView) findViewById(R.id.text_view_pet);
         try {
             // 将cursor之中的数据放在 textview 上
@@ -124,6 +112,18 @@ public class CatalogActivity extends AppCompatActivity {
             // 使用完后释放资源 ，防止发生资源泄露
             cursor.close();
         }
+    }
+    private void insertPet() {
+        // 创建一个ContentValues 存放键对值
+        ContentValues values = new ContentValues();
+        values.put(PetEntry.COLUMN_PET_NAME, "Toto");
+        values.put(PetEntry.COLUMN_PET_BREED, "Terrier");
+        values.put(PetEntry.COLUMN_PET_GENDER, PetEntry.GENDER_MALE);
+        values.put(PetEntry.COLUMN_PET_WEIGHT, 7);
+
+        // 使用contentresolver用于添加数据 它调用的应是PetProvider中德insert方法（根据uri）
+        //返回的是一个uri
+        Uri newUri = getContentResolver().insert(PetEntry.CONTENT_URI, values);
     }
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {

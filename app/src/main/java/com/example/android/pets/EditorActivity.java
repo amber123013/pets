@@ -2,7 +2,7 @@
 package com.example.android.pets;
 
 import android.content.ContentValues;
-import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.NavUtils;
 import android.support.v7.app.AppCompatActivity;
@@ -17,7 +17,6 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.example.android.pets.data.PetContract.PetEntry;
-import com.example.android.pets.data.PetDBHelper;
 
 /**
  * 允许创建一个或者编辑现有的宠物
@@ -98,12 +97,6 @@ public class EditorActivity extends AppCompatActivity {
         String weightString = mWeightEditText.getText().toString().trim();
         int weight = Integer.parseInt(weightString);
 
-        // 创建 PetDBHelper
-        PetDBHelper mDbHelper = new PetDBHelper(this);
-
-        // write
-        SQLiteDatabase db = mDbHelper.getWritableDatabase();
-
         // 创建ContentValues 用于放置键对值
         ContentValues values = new ContentValues();
         values.put(PetEntry.COLUMN_PET_NAME, nameString);
@@ -111,15 +104,16 @@ public class EditorActivity extends AppCompatActivity {
         values.put(PetEntry.COLUMN_PET_GENDER, mGender);
         values.put(PetEntry.COLUMN_PET_WEIGHT, weight);
 
-        // 向数据库中插入一行 (放回一个int
-        long newRowId = db.insert(PetEntry.TABLE_NAME, null, values);
-
-        if (newRowId == -1) {
-            // 值为-1 插入失败
-            Toast.makeText(this, "Error with saving pet", Toast.LENGTH_SHORT).show();
+        //向数据库中插入一行 (放回一个uri
+        Uri newUri = getContentResolver().insert(PetEntry.CONTENT_URI, values);
+        if (newUri == null) {
+            // 如果uri为空 说明插入失败
+            Toast.makeText(this, getString(R.string.editor_insert_pet_failed),
+                    Toast.LENGTH_SHORT).show();
         } else {
-            // 插入成功 放回的 行 号
-            Toast.makeText(this, "Pet saved with row id: " + newRowId, Toast.LENGTH_SHORT).show();
+            // 否则插入成功
+            Toast.makeText(this, getString(R.string.editor_insert_pet_successful),
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
