@@ -1,24 +1,38 @@
 
 package com.example.android.pets;
 
+import android.app.LoaderManager;
+import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.CursorLoader;
 import android.content.Intent;
+import android.content.Loader;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.TextView;
+import android.widget.AdapterView;
+import android.widget.ListView;
 
 import com.example.android.pets.data.PetContract.PetEntry;
 
 /**
  * 显示 宠物列表
  */
-public class CatalogActivity extends AppCompatActivity {
+public class CatalogActivity extends AppCompatActivity implements
+        LoaderManager.LoaderCallbacks<Cursor>{
+
+
+    /** 用于loader的标示符 只要数字是唯一就行 */
+    private static final int PET_LOADER = 0;
+
+    /** listview的Adapter */
+    PetCursorAdapter mCursorAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,6 +49,33 @@ public class CatalogActivity extends AppCompatActivity {
             }
         });
 
+         ListView petListView = (ListView) findViewById(R.id.list);
+        //无数据 显示的视图
+         View emptyView = findViewById(R.id.empty_view);
+         petListView.setEmptyView(emptyView);
+        //设置数据
+         mCursorAdapter = new PetCursorAdapter(this, null);
+         petListView.setAdapter(mCursorAdapter);
+         //设置ListView列表项监听
+         petListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
+                // new intent
+                Intent intent = new Intent(CatalogActivity.this, EditorActivity.class);
+
+                // 将 id append 到 uri
+                Uri currentPetUri = ContentUris.withAppendedId(PetEntry.CONTENT_URI, id);
+
+                // 让intent携带 至 DditorActivity
+                intent.setData(currentPetUri);
+
+                // 启动编辑界面
+                startActivity(intent);
+            }
+        });
+
+         // 启动loader
+         getLoaderManager().initLoader(PET_LOADER, null, this);
     }
 
     @Override
@@ -45,12 +86,7 @@ public class CatalogActivity extends AppCompatActivity {
         return true;
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        displayDatabaseInfo();
-    }
-
+/**
     private void displayDatabaseInfo() {
 
         // 创建或者打开数据库 读取
@@ -74,45 +110,18 @@ public class CatalogActivity extends AppCompatActivity {
                 null,                  // Don't group the rows
                 null,                  // 不按行分组
                 null);                   // 排序
-     */
+
         Cursor cursor = getContentResolver().query(PetEntry.CONTENT_URI,projection,null,null,null);
-        TextView displayView = (TextView) findViewById(R.id.text_view_pet);
-        try {
-            // 将cursor之中的数据放在 textview 上
-            displayView.setText("The pets table contains " + cursor.getCount() + " pets.\n\n");
-            displayView.append(PetEntry._ID + " - " +
-                    PetEntry.COLUMN_PET_NAME + " - " +
-                    PetEntry.COLUMN_PET_BREED + " - " +
-                    PetEntry.COLUMN_PET_GENDER + " - " +
-                    PetEntry.COLUMN_PET_WEIGHT + "\n");
+        /**设置数据
+        ListView petListView = (ListView) findViewById(R.id.list);
+        PetCursorAdapter petCursorAdapter = new PetCursorAdapter(this, cursor);
+        petListView.setAdapter(petCursorAdapter);
+        View emptyView = findViewById(R.id.empty_view);
+        petListView.setEmptyView(emptyView);
 
-            // 得到面对列对应的索引
-            int idColumnIndex = cursor.getColumnIndex(PetEntry._ID);
-            int nameColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_NAME);
-            int breedColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_BREED);
-            int genderColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_GENDER);
-            int weightColumnIndex = cursor.getColumnIndex(PetEntry.COLUMN_PET_WEIGHT);
 
-            // 遍历所有的行 默认位置 为 -1 取到无数据时返回 false
-            while (cursor.moveToNext()) {
-                // 在当前的position取出 int or String
-                int currentID = cursor.getInt(idColumnIndex);
-                String currentName = cursor.getString(nameColumnIndex);
-                String currentBreed = cursor.getString(breedColumnIndex);
-                int currentGender = cursor.getInt(genderColumnIndex);
-                int currentWeight = cursor.getInt(weightColumnIndex);
-                // 添加到 textview显示
-                displayView.append(("\n" + currentID + " - " +
-                        currentName + " - " +
-                        currentBreed + " - " +
-                        currentGender + " - " +
-                        currentWeight));
-            }
-        } finally {
-            // 使用完后释放资源 ，防止发生资源泄露
-            cursor.close();
-        }
     }
+*/
     private void insertPet() {
         // 创建一个ContentValues 存放键对值
         ContentValues values = new ContentValues();
@@ -135,9 +144,50 @@ public class CatalogActivity extends AppCompatActivity {
                 return true;
             // 点击了删除数据
             case R.id.action_delete_all_entries:
-                // Do nothing for now
+                deleteAllPets();
                 return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * 删除所有数据
+     */
+    private void deleteAllPets() {
+        int rowsDeleted = getContentResolver().delete(PetEntry.CONTENT_URI, null, null);
+        Log.v("CatalogActivity", rowsDeleted + " rows deleted from pet database");
+    }
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        // 查询的字段
+        String[] projection = {
+                PetEntry._ID,
+                PetEntry.COLUMN_PET_NAME,
+                PetEntry.COLUMN_PET_BREED };
+
+        // 在后台线程执行Provider的query方法
+        //后台线程只CursorLoader 它继承自AsyncTaskLoader（实现了Runnable）
+        //这里实现的三个抽象方法 都是回调函数执行在主线程
+        // （Activiity调用CursorLoader中的方法，CursorLoader再调用Activity中的方法）
+        //如 数据发生更新时 调用 onLoadFinished 在ui线程完成界面数据更新
+        return new CursorLoader(this,
+                PetEntry.CONTENT_URI, //执行Provider.query 方法时使用的uri
+                projection,
+                null,
+                null,
+                null);
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        // 更新 {@link PetCursorAdapter} 包含新的数据
+        mCursorAdapter.swapCursor(data);
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+        // 当删除数据时调用
+        //设为空 再设置新的数据
+        mCursorAdapter.swapCursor(null);
     }
 }

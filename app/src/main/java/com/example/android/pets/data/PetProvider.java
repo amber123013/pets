@@ -86,6 +86,10 @@ public class PetProvider extends ContentProvider {
             default:
                 throw new IllegalArgumentException("Cannot query unknown URI " + uri);
         }
+        /**在cursor上设置通知uri
+         *当此uri指示的数据发生变化时 就能得知需要更新cursor
+         */
+        cursor.setNotificationUri(getContext().getContentResolver(), uri);
         return cursor;
     }
 
@@ -138,6 +142,10 @@ public class PetProvider extends ContentProvider {
             //返回空的uri
             return null;
         }
+        //插入成功 表格已被修改
+        // 通知监听器 数据已经被修改
+        getContext().getContentResolver().notifyChange(uri, null);
+
         return ContentUris.withAppendedId(uri, id);
     }
 
@@ -191,9 +199,14 @@ public class PetProvider extends ContentProvider {
         }
 
         SQLiteDatabase database = mDBHelper.getWritableDatabase();
-
+        //受影响的行数
+        int rowsUpdated = database.update(PetEntry.TABLE_NAME, values, selection, selectionArgs);
+        //表格被update 通知监听器 数据已经被修改
+        if (rowsUpdated != 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
         // 返回受影响的行数
-        return database.update(PetEntry.TABLE_NAME, values, selection, selectionArgs);
+        return rowsUpdated;
 
     }
 
@@ -211,18 +224,29 @@ public class PetProvider extends ContentProvider {
         SQLiteDatabase database = mDBHelper.getWritableDatabase();
 
         final int match = sUriMatcher.match(uri);
+        int rowsDeleted;
         switch (match) {
             case PETS:
                 // 删除所有宠物
-                return database.delete(PetEntry.TABLE_NAME, selection, selectionArgs);
+                rowsDeleted = database.delete(PetEntry.TABLE_NAME, selection, selectionArgs);
+                break;
             case PET_ID:
                 // 根据id 删除单个宠物
                 selection = PetEntry._ID + "=?";
                 selectionArgs = new String[] { String.valueOf(ContentUris.parseId(uri)) };
-                return database.delete(PetEntry.TABLE_NAME, selection, selectionArgs);
+                //删除一个宠物
+                rowsDeleted = database.delete(PetEntry.TABLE_NAME, selection, selectionArgs);
+                break;
             default:
                 throw new IllegalArgumentException("Deletion is not supported for " + uri);
         }
+        //有数据被删除
+        if (rowsDeleted != 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
+
+        // 返回被删除的行数
+        return rowsDeleted;
     }
 
     /**
